@@ -1,15 +1,15 @@
-o[Defines]
-  PLATFORM_NAME                  = HelloPkg
-  PLATFORM_GUID                  = 5b116823-5895-4b34-9ebd-3c48803f746c
+[Defines]
+  PLATFORM_NAME                  = WcatBootPkg
+  PLATFORM_GUID                  = 6c1d6207-f1e3-4aa1-a215-1e77f9cf9a6f
   PLATFORM_VERSION               = 0.1
   DSC_SPECIFICATION              = 0x00010005
-  OUTPUT_DIRECTORY               = Build/Hello
+  OUTPUT_DIRECTORY               = Build/WcatBoot
   SUPPORTED_ARCHITECTURES        = X64
   BUILD_TARGETS                  = DEBUG|RELEASE|NOOPT
 
 
 [LibraryClasses]
-UefiApplicationEntryPoint|MdePkg/Library/UefiApplicationEntryPoint/UefiApplicationEntryPoint.inf
+  UefiApplicationEntryPoint|MdePkg/Library/UefiApplicationEntryPoint/UefiApplicationEntryPoint.inf
   UefiLib|MdePkg/Library/UefiLib/UefiLib.inf
 
   BaseLib|MdePkg/Library/BaseLib/BaseLib.inf
@@ -23,4 +23,5 @@ UefiApplicationEntryPoint|MdePkg/Library/UefiApplicationEntryPoint/UefiApplicati
   UefiRuntimeServicesTableLib|MdePkg/Library/UefiRuntimeServicesTableLib/UefiRuntimeServicesTableLib.inf
 
 [Components]
-  HelloPkg/Hello/Hello.inf
+  WcatBootPkg/WcatBoot/WcatBoot.inf
+  
