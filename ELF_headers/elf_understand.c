@@ -54,7 +54,7 @@ void print_pheader(Elf64_Phdr *ELF_programheader) {
 
 }
 
-int main(int argc, char argv[]) {
+int main(int argc, char* argv[]) {
     FILE *elf_file;
     unsigned char *buff;
     Elf64_Ehdr *ELF_header;
@@ -71,7 +71,7 @@ int main(int argc, char argv[]) {
     }
 
     // buffにelf_fileのファイル内容を展開する
-    fread(buff, 1, 8192, elf_file);
+    fread(buff, 1, 8192, elf_file); /* */
     ELF_header = buff;
 
     // ELFヘッダ

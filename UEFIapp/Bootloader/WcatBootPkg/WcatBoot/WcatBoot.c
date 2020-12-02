@@ -1,6 +1,11 @@
 /* memo */
 /* ファイルの中身を読み出す場合、簡易的なテスト目的であればBufferでいいかもしれないが */
 /* 本格的に読み出す場合、メモリを確保する必要がある(gBS->AllocatePool) */
+/* Qemuのブート */
+/* qemu-system-x86_64 -m 512 -serial mon:stdio -d cpu_reset -bios OVMF.fd -hda fat:rw:hdd */
+/* テスト用疑似kernelのコンパイル */
+/* clang -O2 -Wall -g --target=x86_64-elf -ffreestanding -mno-red-zone -fno-exceptions -fno-rtti -std=c17 -c kernel.c */
+/* ld.lld --entry kernel_main -z norelro --image-base 0x100000 --static -o kernel.elf kernel.o */
 
 #include  <Uefi.h>
 #include  <Library/UefiLib.h>
@@ -14,6 +19,8 @@
 #include  <Protocol/BlockIo.h>
 #include  <Guid/FileInfo.h>
 #include  <stdint.h>
+
+#include "elf_header.h"
 /* ELFヘッダーは */
 
 EFI_SIMPLE_FILE_SYSTEM_PROTOCOL *SFSP;
@@ -39,6 +46,7 @@ void strncopy(unsigned short *dst, unsigned short *src, unsigned long long n)
 
 
 /* while(1)で止めるのは気持ち悪いので */
+/* この関数を読み出すとCPUが休止モードになる */
 void hlt(){
   while(1) __asm__("hlt");
 }
@@ -49,6 +57,19 @@ EFI_STATUS OpenRootDir(EFI_HANDLE image_handle, EFI_FILE_PROTOCOL **root) {
   EFI_LOADED_IMAGE_PROTOCOL *loaded_image;
   EFI_SIMPLE_FILE_SYSTEM_PROTOCOL* fs;
 
+  /* なぜはじめOpenVolumeでプロトコルを開けなかったか？ */
+  /* EFI_SIMPLE_FILE_SYSTEM_PROTOCOL *SFSPは取得していたが、GUIDを使ってプロトコルの先頭アドレスを割り当てていなかったためプロトコルが開けなかった。 */
+  /* ST->BootServices->LocateProtocol(&sfsp_guid, NULL, (void **)&SFSP); */
+  /* この処理が足りなかった */
+
+  
+  /* 自分自身へのイメージハンドルを取得している */
+  /* OpenProtocolに関しては、UEFI Spec 2.8B May 2020のP188を参照 */
+  /* これはHandleProtocolの拡張版 */
+  /* 指定されたプロトコルをサポートしているかを判定し、サポートしているようであればプロトコルをオープンにする */
+
+
+  /* 自身のハンドラを取得し */
   status = gBS->OpenProtocol(
 							 image_handle,
 							 &gEfiLoadedImageProtocolGuid,
@@ -60,6 +81,7 @@ EFI_STATUS OpenRootDir(EFI_HANDLE image_handle, EFI_FILE_PROTOCOL **root) {
     return status;
   }
 
+  /* EFI_SIMPLE_FILESYSTEM_PROTOCOLを取得する */
   status = gBS->OpenProtocol(
 							 loaded_image->DeviceHandle,
 							 &gEfiSimpleFileSystemProtocolGuid,
@@ -93,30 +115,46 @@ UefiMain (
   UINTN waitIndex;
 
 
+  /* watchdogタイマの無効化 */
+  /* 5分刻みで再起動してしまうのを防ぐ。 */
+  SystemTable->BootServices->SetWatchdogTimer(0,0,0,NULL);
+  
   /* 画面クリアを行う */
   SystemTable->ConOut->ClearScreen(SystemTable->ConOut);
 
 
   /* ロゴの表示（エスケープシーケンスに注意） */
   Print(L" __       __                        __       ______    ______  \n");
+  SystemTable->BootServices->Stall(100000);
   Print(L"/  |  _  /  |                      /  |     /      \\  /      \\ \n");
+  SystemTable->BootServices->Stall(100000);
   Print(L"$$ | / \\ $$ |  _______   ______   _$$ |_   /$$$$$$  |/$$$$$$  |\n");
+  SystemTable->BootServices->Stall(100000);
   Print(L"$$ |/$  \\$$ | /       | /      \\ / $$   |  $$ |  $$ |$$ \\__$$/ \n");
+  SystemTable->BootServices->Stall(100000);
   Print(L"$$ /$$$  $$ |/$$$$$$$/  $$$$$$  |$$$$$$/   $$ |  $$ |$$      \\ \n");
+  SystemTable->BootServices->Stall(100000);
   Print(L"$$ $$/$$ $$ |$$ |       /    $$ |  $$ | __ $$ |  $$ | $$$$$$  |\n");
+  SystemTable->BootServices->Stall(100000);
   Print(L"$$$$/  $$$$ |$$ \\_____ /$$$$$$$ |  $$ |/  |$$ \\__$$ |/  \\__$$ |\n");
+  SystemTable->BootServices->Stall(100000);
   Print(L"$$$/    $$$ |$$       |$$    $$ |  $$  $$/ $$    $$/ $$    $$/ \n");
+  SystemTable->BootServices->Stall(100000);
   Print(L"$$/      $$/  $$$$$$$/  $$$$$$$/    $$$$/   $$$$$$/   $$$$$$/  \n");
+  SystemTable->BootServices->Stall(100000);
   Print(L"                                                               \n");
+  SystemTable->BootServices->Stall(100000);
   Print(L"                                                               \n");
+  SystemTable->BootServices->Stall(100000);
   Print(L"                                                               \n");
+  SystemTable->BootServices->Stall(100000);
 
   /* カーネルブートするかのチェックを行う */
   Print(L"Kernel boot(press RET)\n");
   SystemTable->BootServices->WaitForEvent(1,&(SystemTable->ConIn->WaitForKey),&waitIndex);//入力があるまで待機
 
 
-
+  /* RETキーが押されると進む */
   while (1) {
 	SystemTable->ConIn->ReadKeyStroke(SystemTable->ConIn,&key);
     if(key.UnicodeChar != '\r'){
@@ -124,17 +162,20 @@ UefiMain (
 	  break;
 	}
   }
-
-  
+  SystemTable->BootServices->Stall(500000);
+  /* rootディレクトリの情報を読み出している */
   status = OpenRootDir(ImageHandle, &root);
+  Print(L"OpenRootDir:%r\n", status);
   if (EFI_ERROR(status)) {
-    Print(L"failed to open root directory: %r\n", status);
     hlt();
   }
-  Print(L"OpenRootDir:%r\n", status);
 
-  /* ファイル名を繰り返すことで読み出している */
+  /* SystemTable->BootServices->Stall(1000000); */
+  SystemTable->BootServices->Stall(500000);
+  /* Rootでぃれくとりの表示 */
   Print(L"RootDirectory: ");
+  
+  /* ファイル名を繰り返すことで読み出している */
   while(1) {
 	buf_size = MAX_FILE_BUF;
 	status = root->Read(root, &buf_size, (void *)file_buf);
@@ -155,7 +196,7 @@ UefiMain (
 	index++;
   }
   Print(L"\n");
-
+  SystemTable->BootServices->Stall(500000);
 
   /* 疑似シェルのlsコマンドとする場合等はCloseが必要となるが現状はファイル名を読み出したいだけであるためなし */
 
@@ -174,16 +215,16 @@ UefiMain (
 
   Print(L"kernelfile is a.out\n");
   status = root->Open(
-					  root, &kernel_file, L"\\a.out", /* a.out(linuxバイナリ)をkernelに見立ててデータを読み出す */
+					  root, &kernel_file, L"\\kernel.elf", /* a.out(linuxバイナリ)をkernelに見立ててデータを読み出す */
 					  EFI_FILE_MODE_READ, 0);
-
+  SystemTable->BootServices->Stall(500000);
   Print(L"kernelfile open:%r\n", status);
   if (EFI_ERROR(status)) {
 	hlt();
   }
 
 
-  
+    SystemTable->BootServices->Stall(500000);
   VOID *kernel_buffer;			/* kernelのバイナリ読み出し用 */
   UINTN kernel_file_info_size = sizeof(EFI_FILE_INFO) + sizeof(CHAR16) * 12;
   UINT8 kernel_file_info_buf[kernel_file_info_size];
@@ -196,29 +237,37 @@ UefiMain (
   EFI_FILE_INFO* kerne_file_info = (EFI_FILE_INFO*)kernel_file_info_buf;
   UINTN kernel_file_size = kerne_file_info->FileSize;
 
-
+  SystemTable->BootServices->Stall(500000);
   status = gBS->AllocatePool(EfiLoaderData, kernel_file_size, (void **)&kernel_buffer);
   Print(L"AllocatePool: %r\n", status);
   if (EFI_ERROR(status)) {
 	hlt();
   }
-  
+    SystemTable->BootServices->Stall(500000);
   status = kernel_file->Read(kernel_file, &kernel_file_size, kernel_buffer);
   Print(L"kernelRead: %r\n", status);
   if (EFI_ERROR(status)) {
 	hlt();
   }
 
-  /* status = ReadFile(kernel_file, &kernel_buffer); */
+  SystemTable->BootServices->Stall(500000);
   uint8_t * kernele_buf_test = (uint8_t *)kernel_buffer;
   int i;
+  Print(L"Magic Number:");
   for (i = 0; i < 16; i++){
-	Print(L"%08x\n", kernele_buf_test[i]);
+	  SystemTable->BootServices->Stall(100000);
+	Print(L"%02x ", kernele_buf_test[i]);
   }
+  Print(L"\n");
 
 
+  Elf64_Ehdr *kerbel_ehdr = (Elf64_Ehdr *)kernel_buffer;
+  SystemTable->BootServices->Stall(500000);
+  Print(L"%16x\n", kerbel_ehdr->e_entry);
 
-	
+  
+  /*  */
+  
   hlt();
   return 0;
 }
