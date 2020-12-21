@@ -5,6 +5,8 @@
 
 #define EI_NIDENT 16
 
+#define PT_LOAD 1				/* セグメントの型や配列情報の解釈方法 */
+
 typedef struct elfheader {
   unsigned char e_ident [EI_NIDENT];
   uint16_t e_type;
