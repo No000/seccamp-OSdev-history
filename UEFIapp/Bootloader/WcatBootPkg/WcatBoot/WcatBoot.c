@@ -7,6 +7,8 @@
 /* clang -O2 -Wall -g --target=x86_64-elf -ffreestanding -mno-red-zone -fno-exceptions -fno-rtti -std=c17 -c kernel.c */
 /* ld.lld --entry kernel_main -z norelro --image-base 0x100000 --static -o kernel.elf kernel.o */
 
+/* statusチェックを光らせたいので、関数を作っていおきかえる */
+
 #include  <Uefi.h>
 #include  <Library/UefiLib.h>
 #include  <Library/UefiBootServicesTableLib.h>
@@ -14,9 +16,12 @@
 #include  <Library/MemoryAllocationLib.h>
 #include  <Library/BaseMemoryLib.h>
 #include  <Protocol/LoadedImage.h>
-#include  <Protocol/SimpleFileSystem.h>
+#include <Protocol/SimpleFileSystem.h>
+
+#include <Protocol/SimpleTextOut.h> /* 追加 */
+
 #include  <Protocol/DiskIo2.h>
-#include  <Protocol/BlockIo.h>
+#include <Protocol/BlockIo.h>
 #include  <Guid/FileInfo.h>
 #include <stdint.h>
 
@@ -28,13 +33,16 @@ EFI_SYSTEM_TABLE *ST;
 
 /* 追加 */
 /* ここはfile_infoを利用して動的に取得できるようにする */
-#define MAX_FILE_NAME_LEN 8
+#define MAX_FILE_NAME_LEN 15
 #define MAX_FILE_NUM 10
 #define MAX_FILE_BUF 1024 /* test用のファイルバッファの大きさ */
 
 struct FILE {
   uint16_t name[MAX_FILE_NAME_LEN];
 } __attribute__((packed));
+
+
+
 /* strncpyだが名前衝突のエラーがうっとおしいため */
 /* 参考にした場合のミスが目立つ場合戻すこと */
 void strncopy(unsigned short *dst, unsigned short *src, unsigned long long n) {
@@ -49,7 +57,6 @@ void hlt() {
     __asm__("hlt");
 }
 
-/* 12_04 正常に戻す場合はここを編集 */
 
 /* MikanOSのブートローダーより引用 */
 EFI_STATUS OpenRootDir(EFI_HANDLE image_handle, EFI_FILE_PROTOCOL **root) {
@@ -163,7 +170,16 @@ UefiMain(IN EFI_HANDLE ImageHandle, IN EFI_SYSTEM_TABLE *SystemTable) {
   /* -------------------------------------------------------- */
 
   status = OpenRootDir(ImageHandle, &root);
-  Print(L"OpenRootDir:%r\n", status);
+  Print(L"OpenRootDir:[");
+  if (EFI_ERROR(status)) {
+    SystemTable->ConOut->SetAttribute(SystemTable->ConOut, EFI_LIGHTRED);
+    Print(L"%r", status);
+  } else {
+    SystemTable->ConOut->SetAttribute(SystemTable->ConOut, EFI_LIGHTGREEN);
+    Print(L"%r", status);
+  }
+  SystemTable->ConOut->SetAttribute(SystemTable->ConOut, EFI_WHITE);
+  Print(L"]\n");
   if (EFI_ERROR(status)) {
     hlt();
   }
@@ -177,10 +193,6 @@ UefiMain(IN EFI_HANDLE ImageHandle, IN EFI_SYSTEM_TABLE *SystemTable) {
   while (1) {
     buf_size = MAX_FILE_BUF;
     status = root->Read(root, &buf_size, (void *)file_buf);
-    if (EFI_ERROR(status)) {
-      Print(L"Read status:%r\n", status);
-      hlt();
-    }
     if (!buf_size) {
       break;
     }
@@ -192,7 +204,26 @@ UefiMain(IN EFI_HANDLE ImageHandle, IN EFI_SYSTEM_TABLE *SystemTable) {
     Print(L" ");
     index++;
   }
+
   Print(L"\n");
+  
+  SystemTable->BootServices->Stall(500000);
+  Print(L"Read status:[");
+  if (EFI_ERROR(status)) {
+    SystemTable->ConOut->SetAttribute(SystemTable->ConOut, EFI_LIGHTRED);
+    Print(L"%r", status);
+  } else {
+    SystemTable->ConOut->SetAttribute(SystemTable->ConOut, EFI_LIGHTGREEN);
+    Print(L"%r", status);
+  }
+  SystemTable->ConOut->SetAttribute(SystemTable->ConOut, EFI_WHITE);
+  Print(L"]\n");
+  if (EFI_ERROR(status)) {
+    hlt();
+  }
+
+
+  
   SystemTable->BootServices->Stall(500000);
 
   /* 疑似シェルのlsコマンドとする場合等はCloseが必要となるが現状はファイル名を読み出したいだけであるためなし */
@@ -208,12 +239,21 @@ UefiMain(IN EFI_HANDLE ImageHandle, IN EFI_SYSTEM_TABLE *SystemTable) {
   /* kernelのファイルを開く */
   EFI_FILE_PROTOCOL *kernel_file;
 
-  Print(L"kernelfile is a.out\n");
+  Print(L"kernelfile is kernel.elf\n");
   status = root->Open(root, &kernel_file, L"\\kernel.elf", /* a.out(linuxバイナリ)をkernelに見立ててデータを読み出す
                                                             */
                       EFI_FILE_MODE_READ, 0);
   SystemTable->BootServices->Stall(500000);
-  Print(L"kernelfile open:%r\n", status);
+  Print(L"kernelfile open:[");
+  if (EFI_ERROR(status)) {
+    SystemTable->ConOut->SetAttribute(SystemTable->ConOut, EFI_LIGHTRED);
+    Print(L"%r", status);
+  } else {
+    SystemTable->ConOut->SetAttribute(SystemTable->ConOut, EFI_LIGHTGREEN);
+    Print(L"%r", status);
+  }
+  SystemTable->ConOut->SetAttribute(SystemTable->ConOut, EFI_WHITE);
+  Print(L"]\n");
   if (EFI_ERROR(status)) {
     hlt();
   }
@@ -224,7 +264,16 @@ UefiMain(IN EFI_HANDLE ImageHandle, IN EFI_SYSTEM_TABLE *SystemTable) {
   UINT8 kernel_file_info_buf[kernel_file_info_size];
   status = kernel_file->GetInfo(kernel_file, &gEfiFileInfoGuid,
                                 &kernel_file_info_size, kernel_file_info_buf);
-  Print(L"Getinfo: %r\n", status);
+  Print(L"Getinfo:[", status);
+  if (EFI_ERROR(status)) {
+    SystemTable->ConOut->SetAttribute(SystemTable->ConOut, EFI_LIGHTRED);
+    Print(L"%r", status);
+  } else {
+    SystemTable->ConOut->SetAttribute(SystemTable->ConOut, EFI_LIGHTGREEN);
+    Print(L"%r", status);
+  }
+  SystemTable->ConOut->SetAttribute(SystemTable->ConOut, EFI_WHITE);
+  Print(L"]\n");
   if (EFI_ERROR(status)) {
     hlt();
   }
@@ -233,15 +282,35 @@ UefiMain(IN EFI_HANDLE ImageHandle, IN EFI_SYSTEM_TABLE *SystemTable) {
   UINTN kernel_file_size = kerne_file_info->FileSize;
 
   SystemTable->BootServices->Stall(500000);
-  status = gBS->AllocatePool(EfiLoaderData, kernel_file_size,
-                             (void **)&kernel_buffer);
-  Print(L"AllocatePool: %r\n", status);
+  status = gBS->AllocatePool(EfiLoaderData, kernel_file_size, (void **)&kernel_buffer);
+  
+  Print(L"AllocatePool: [", status);
+  if (EFI_ERROR(status)) {
+    SystemTable->ConOut->SetAttribute(SystemTable->ConOut, EFI_LIGHTRED);
+    Print(L"%r", status);
+  } else {
+    SystemTable->ConOut->SetAttribute(SystemTable->ConOut, EFI_LIGHTGREEN);
+    Print(L"%r", status);
+  }
+  SystemTable->ConOut->SetAttribute(SystemTable->ConOut, EFI_WHITE);
+  Print(L"]\n");
   if (EFI_ERROR(status)) {
     hlt();
   }
   SystemTable->BootServices->Stall(500000);
   status = kernel_file->Read(kernel_file, &kernel_file_size, kernel_buffer);
-  Print(L"kernelRead: %r\n", status);
+
+  
+  Print(L"kernelRead: [");
+  if (EFI_ERROR(status)) {
+    SystemTable->ConOut->SetAttribute(SystemTable->ConOut, EFI_LIGHTRED);
+    Print(L"%r", status);
+  } else {
+    SystemTable->ConOut->SetAttribute(SystemTable->ConOut, EFI_LIGHTGREEN);
+    Print(L"%r", status);
+  }
+  SystemTable->ConOut->SetAttribute(SystemTable->ConOut, EFI_WHITE);
+  Print(L"]\n");
   if (EFI_ERROR(status)) {
     hlt();
   }
@@ -259,7 +328,7 @@ UefiMain(IN EFI_HANDLE ImageHandle, IN EFI_SYSTEM_TABLE *SystemTable) {
   /* アドレスの計算を行う */
   Elf64_Ehdr *kernel_ehdr = (Elf64_Ehdr *)kernel_buffer;
   SystemTable->BootServices->Stall(500000);
-  Print(L"entrypoint address");
+  Print(L"entrypoint address:\t");
   Print(L"%08x\n", kernel_ehdr->e_entry);
 
   /* 以下にELF形式の */
@@ -328,18 +397,29 @@ UefiMain(IN EFI_HANDLE ImageHandle, IN EFI_SYSTEM_TABLE *SystemTable) {
            remain_byte, 0);
 
     SystemTable->BootServices->Stall(500000);
-    Print(L"kernel first address: %08x\n", kernel_first_address);
+    Print(L"kernel first address:\t\t%08x\n", kernel_first_address);
     SystemTable->BootServices->Stall(500000);
-    Print(L"kernel last address: %08x\n", kernel_last_address);
+    Print(L"kernel last address:\t\t%08x\n", kernel_last_address);
 
     status = SystemTable->BootServices->FreePool(kernel_buffer);
 
-    Print(L"free pool: %r\n", status);
+    SystemTable->BootServices->Stall(500000);
+
+    /* SystemTable->ConOut->SetAttribute(SystemTable->ConOut, EFI_LIGHTGREEN);
+     */
+    Print(L"free pool: [");
+    if (EFI_ERROR(status)) {
+      SystemTable->ConOut->SetAttribute(SystemTable->ConOut, EFI_LIGHTRED);
+      Print(L"%r", status);
+    } else {
+      SystemTable->ConOut->SetAttribute(SystemTable->ConOut, EFI_LIGHTGREEN);
+      Print(L"%r", status);
+    }
+    SystemTable->ConOut->SetAttribute(SystemTable->ConOut, EFI_WHITE);
+    Print(L"]\n");
     if (EFI_ERROR(status)) {
       hlt();
     }
-
-	
   }
 
   hlt();
