@@ -6,8 +6,10 @@
 /* テスト用疑似kernelのコンパイル */
 /* clang -O2 -Wall -g --target=x86_64-elf -ffreestanding -mno-red-zone -fno-exceptions -fno-rtti -std=c17 -c kernel.c */
 /* ld.lld --entry kernel_main -z norelro --image-base 0x100000 --static -o kernel.elf kernel.o */
-
 /* statusチェックを光らせたいので、関数を作っていおきかえる */
+/* 12/21 コードがツメツメで読みにくいので、余裕があるようにする */
+/* 12/21 ClearscreenとPrintを高速で繰り返せば選択画面を作れそう。（キー入力があれば、内容を書き換えた画面を表示） */
+/* 数値の出力にはEFI_LIGHTCYANでシアン色に変更することにする */
 
 #include  <Uefi.h>
 #include  <Library/UefiLib.h>
@@ -16,14 +18,14 @@
 #include  <Library/MemoryAllocationLib.h>
 #include  <Library/BaseMemoryLib.h>
 #include  <Protocol/LoadedImage.h>
-#include <Protocol/SimpleFileSystem.h>
+#include  <Protocol/SimpleFileSystem.h>
 
-#include <Protocol/SimpleTextOut.h> /* 追加 */
+#include  <Protocol/SimpleTextOut.h> /* 追加(いらんかも？) */
 
 #include  <Protocol/DiskIo2.h>
-#include <Protocol/BlockIo.h>
+#include  <Protocol/BlockIo.h>
 #include  <Guid/FileInfo.h>
-#include <stdint.h>
+#include  <stdint.h>
 
 #include "elf_header.h"
 /* ELFヘッダーは */
@@ -33,15 +35,26 @@ EFI_SYSTEM_TABLE *ST;
 
 /* 追加 */
 /* ここはfile_infoを利用して動的に取得できるようにする */
-#define MAX_FILE_NAME_LEN 15
+#define MAX_FILE_NAME_LEN 15	/* ルートディレクトリを表示する際のファイル名の */
 #define MAX_FILE_NUM 10
 #define MAX_FILE_BUF 1024 /* test用のファイルバッファの大きさ */
 
+/* ファイル名格納用構造体 */
 struct FILE {
   uint16_t name[MAX_FILE_NAME_LEN];
 } __attribute__((packed));
 
-
+/* このMemoryMapはヘッダーファイル化してkernelにもincludeさせる必要があるかもしれない
+ */
+/* mikanosのkernel/memory_map.hppを参考に作成 */
+struct MemoryMap {
+  unsigned long long buffer_size;
+  void *buffer;
+  unsigned long long map_size;
+  unsigned long long map_key;
+  unsigned long long descriptor_size;
+  uint32_t descriptor_version;
+};
 
 /* strncpyだが名前衝突のエラーがうっとおしいため */
 /* 参考にした場合のミスが目立つ場合戻すこと */
@@ -170,7 +183,7 @@ UefiMain(IN EFI_HANDLE ImageHandle, IN EFI_SYSTEM_TABLE *SystemTable) {
   /* -------------------------------------------------------- */
 
   status = OpenRootDir(ImageHandle, &root);
-  Print(L"OpenRootDir:[");
+  Print(L"[");
   if (EFI_ERROR(status)) {
     SystemTable->ConOut->SetAttribute(SystemTable->ConOut, EFI_LIGHTRED);
     Print(L"%r", status);
@@ -179,7 +192,7 @@ UefiMain(IN EFI_HANDLE ImageHandle, IN EFI_SYSTEM_TABLE *SystemTable) {
     Print(L"%r", status);
   }
   SystemTable->ConOut->SetAttribute(SystemTable->ConOut, EFI_WHITE);
-  Print(L"]\n");
+  Print(L"]    OpenRootDir\n");
   if (EFI_ERROR(status)) {
     hlt();
   }
@@ -208,7 +221,7 @@ UefiMain(IN EFI_HANDLE ImageHandle, IN EFI_SYSTEM_TABLE *SystemTable) {
   Print(L"\n");
   
   SystemTable->BootServices->Stall(500000);
-  Print(L"Read status:[");
+  Print(L"[");
   if (EFI_ERROR(status)) {
     SystemTable->ConOut->SetAttribute(SystemTable->ConOut, EFI_LIGHTRED);
     Print(L"%r", status);
@@ -217,7 +230,7 @@ UefiMain(IN EFI_HANDLE ImageHandle, IN EFI_SYSTEM_TABLE *SystemTable) {
     Print(L"%r", status);
   }
   SystemTable->ConOut->SetAttribute(SystemTable->ConOut, EFI_WHITE);
-  Print(L"]\n");
+  Print(L"]    Read status\n");
   if (EFI_ERROR(status)) {
     hlt();
   }
@@ -240,11 +253,11 @@ UefiMain(IN EFI_HANDLE ImageHandle, IN EFI_SYSTEM_TABLE *SystemTable) {
   EFI_FILE_PROTOCOL *kernel_file;
 
   Print(L"kernelfile is kernel.elf\n");
-  status = root->Open(root, &kernel_file, L"\\kernel.elf", /* a.out(linuxバイナリ)をkernelに見立ててデータを読み出す
-                                                            */
-                      EFI_FILE_MODE_READ, 0);
+  status = root->Open(root, &kernel_file, L"\\kernel.elf", EFI_FILE_MODE_READ, 0); /* kernelのファイルを読み出す*/
+                      
   SystemTable->BootServices->Stall(500000);
-  Print(L"kernelfile open:[");
+
+  Print(L"[", status);
   if (EFI_ERROR(status)) {
     SystemTable->ConOut->SetAttribute(SystemTable->ConOut, EFI_LIGHTRED);
     Print(L"%r", status);
@@ -253,7 +266,7 @@ UefiMain(IN EFI_HANDLE ImageHandle, IN EFI_SYSTEM_TABLE *SystemTable) {
     Print(L"%r", status);
   }
   SystemTable->ConOut->SetAttribute(SystemTable->ConOut, EFI_WHITE);
-  Print(L"]\n");
+  Print(L"]    kernelfile open\n");
   if (EFI_ERROR(status)) {
     hlt();
   }
@@ -264,7 +277,7 @@ UefiMain(IN EFI_HANDLE ImageHandle, IN EFI_SYSTEM_TABLE *SystemTable) {
   UINT8 kernel_file_info_buf[kernel_file_info_size];
   status = kernel_file->GetInfo(kernel_file, &gEfiFileInfoGuid,
                                 &kernel_file_info_size, kernel_file_info_buf);
-  Print(L"Getinfo:[", status);
+  Print(L"[", status);
   if (EFI_ERROR(status)) {
     SystemTable->ConOut->SetAttribute(SystemTable->ConOut, EFI_LIGHTRED);
     Print(L"%r", status);
@@ -273,7 +286,7 @@ UefiMain(IN EFI_HANDLE ImageHandle, IN EFI_SYSTEM_TABLE *SystemTable) {
     Print(L"%r", status);
   }
   SystemTable->ConOut->SetAttribute(SystemTable->ConOut, EFI_WHITE);
-  Print(L"]\n");
+  Print(L"]    Getinfo\n");
   if (EFI_ERROR(status)) {
     hlt();
   }
@@ -284,7 +297,7 @@ UefiMain(IN EFI_HANDLE ImageHandle, IN EFI_SYSTEM_TABLE *SystemTable) {
   SystemTable->BootServices->Stall(500000);
   status = gBS->AllocatePool(EfiLoaderData, kernel_file_size, (void **)&kernel_buffer);
   
-  Print(L"AllocatePool: [", status);
+  Print(L"[", status);
   if (EFI_ERROR(status)) {
     SystemTable->ConOut->SetAttribute(SystemTable->ConOut, EFI_LIGHTRED);
     Print(L"%r", status);
@@ -293,7 +306,7 @@ UefiMain(IN EFI_HANDLE ImageHandle, IN EFI_SYSTEM_TABLE *SystemTable) {
     Print(L"%r", status);
   }
   SystemTable->ConOut->SetAttribute(SystemTable->ConOut, EFI_WHITE);
-  Print(L"]\n");
+  Print(L"]    AllocatePool\n");
   if (EFI_ERROR(status)) {
     hlt();
   }
@@ -301,7 +314,7 @@ UefiMain(IN EFI_HANDLE ImageHandle, IN EFI_SYSTEM_TABLE *SystemTable) {
   status = kernel_file->Read(kernel_file, &kernel_file_size, kernel_buffer);
 
   
-  Print(L"kernelRead: [");
+  Print(L"[");
   if (EFI_ERROR(status)) {
     SystemTable->ConOut->SetAttribute(SystemTable->ConOut, EFI_LIGHTRED);
     Print(L"%r", status);
@@ -310,7 +323,7 @@ UefiMain(IN EFI_HANDLE ImageHandle, IN EFI_SYSTEM_TABLE *SystemTable) {
     Print(L"%r", status);
   }
   SystemTable->ConOut->SetAttribute(SystemTable->ConOut, EFI_WHITE);
-  Print(L"]\n");
+  Print(L"]    kernelRead\n");
   if (EFI_ERROR(status)) {
     hlt();
   }
@@ -374,11 +387,21 @@ UefiMain(IN EFI_HANDLE ImageHandle, IN EFI_SYSTEM_TABLE *SystemTable) {
   status = gBS->AllocatePages(AllocateAddress, EfiLoaderData, 
 							  num_pages, &kernel_first_address);
 
-  Print(L"allocate pages:%r\n", status);
+
+  Print(L"[");
+  if (EFI_ERROR(status)) {
+    SystemTable->ConOut->SetAttribute(SystemTable->ConOut, EFI_LIGHTRED);
+    Print(L"%r", status);
+  } else {
+    SystemTable->ConOut->SetAttribute(SystemTable->ConOut, EFI_LIGHTGREEN);
+    Print(L"%r", status);
+  }
+  SystemTable->ConOut->SetAttribute(SystemTable->ConOut, EFI_WHITE);
+  Print(L"]    allocate pages\n");
   if (EFI_ERROR(status)) {
     hlt();
   }
-
+  
   /* セグメントコピーの開始 */
   /* ここからはプログラムヘッダーに従ってセグメントをロードしていく */
 
@@ -389,25 +412,23 @@ UefiMain(IN EFI_HANDLE ImageHandle, IN EFI_SYSTEM_TABLE *SystemTable) {
 
     /* 以下の処理がわからんので調べる */
     UINT64 segment_in_file = (UINT64)kernel_ehdr + phdr_copy_seg[i].p_offset;
-    CopyMem((VOID *)phdr_copy_seg[i].p_vaddr, (VOID *)segment_in_file,
-            phdr_copy_seg[i].p_filesz);
+    CopyMem((VOID *)phdr_copy_seg[i].p_vaddr, (VOID *)segment_in_file, phdr_copy_seg[i].p_filesz);
 
     UINTN remain_byte = phdr_copy_seg[i].p_memsz - phdr_copy_seg[i].p_filesz;
-    SetMem((VOID *)(phdr_copy_seg[i].p_vaddr + phdr_copy_seg[i].p_filesz),
-           remain_byte, 0);
+    SetMem((VOID *)(phdr_copy_seg[i].p_vaddr + phdr_copy_seg[i].p_filesz), remain_byte, 0);
+
+	
 
     SystemTable->BootServices->Stall(500000);
     Print(L"kernel first address:\t\t%08x\n", kernel_first_address);
     SystemTable->BootServices->Stall(500000);
     Print(L"kernel last address:\t\t%08x\n", kernel_last_address);
-
+	
+	/* ====================================================================================== */
+	/* カーネルの情報を読み出すために使用したメモリ上の一時領域を開放する */
     status = SystemTable->BootServices->FreePool(kernel_buffer);
-
     SystemTable->BootServices->Stall(500000);
-
-    /* SystemTable->ConOut->SetAttribute(SystemTable->ConOut, EFI_LIGHTGREEN);
-     */
-    Print(L"free pool: [");
+    Print(L"[");
     if (EFI_ERROR(status)) {
       SystemTable->ConOut->SetAttribute(SystemTable->ConOut, EFI_LIGHTRED);
       Print(L"%r", status);
@@ -416,7 +437,57 @@ UefiMain(IN EFI_HANDLE ImageHandle, IN EFI_SYSTEM_TABLE *SystemTable) {
       Print(L"%r", status);
     }
     SystemTable->ConOut->SetAttribute(SystemTable->ConOut, EFI_WHITE);
-    Print(L"]\n");
+    Print(L"]    free pool\n");
+    if (EFI_ERROR(status)) {
+      hlt();
+    }
+	/* ====================================================================================== */
+	/* ====================================================================================== */
+	/* ExitBootServicesするためのmemorymapを取得する */
+
+
+
+	/* MemoryMapを入れるためのメモリの一時領域を定義する */
+	/* mikanosのブートローダ273行目あたりを参照 */
+
+    CHAR8 memmap_buffer[4096 * 4];
+    struct MemoryMap map = {sizeof(memmap_buffer), memmap_buffer, 0, 0, 0, 0};
+
+    if (map.buffer == NULL) {
+      status = EFI_BUFFER_TOO_SMALL;
+      Print(L"[");
+      if (EFI_ERROR(status)) {
+        SystemTable->ConOut->SetAttribute(SystemTable->ConOut, EFI_LIGHTRED);
+        Print(L"%r", status);
+      } else {
+        SystemTable->ConOut->SetAttribute(SystemTable->ConOut, EFI_LIGHTGREEN);
+        Print(L"%r", status);
+      }
+      SystemTable->ConOut->SetAttribute(SystemTable->ConOut, EFI_WHITE);
+      Print(L"]    GetMemoryMap\n");
+      if (EFI_ERROR(status)) {
+        hlt();
+      }
+    }
+
+        map.map_size = map.buffer_size;
+
+	status = SystemTable->BootServices->GetMemoryMap(&map.map_size,
+													 (EFI_MEMORY_DESCRIPTOR*)map.buffer,
+													 &map.map_key,
+													 &map.descriptor_size,
+													 &map.descriptor_version);
+
+    Print(L"[");
+    if (EFI_ERROR(status)) {
+      SystemTable->ConOut->SetAttribute(SystemTable->ConOut, EFI_LIGHTRED);
+      Print(L"%r", status);
+    } else {
+      SystemTable->ConOut->SetAttribute(SystemTable->ConOut, EFI_LIGHTGREEN);
+      Print(L"%r", status);
+    }
+    SystemTable->ConOut->SetAttribute(SystemTable->ConOut, EFI_WHITE);
+    Print(L"]    GetMemoryMap\n");
     if (EFI_ERROR(status)) {
       hlt();
     }
