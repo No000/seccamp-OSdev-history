@@ -458,7 +458,7 @@ UefiMain(EFI_HANDLE ImageHandle,EFI_SYSTEM_TABLE *SystemTable) {
   /* mikanosのブートローダ273行目あたりを参照 */
 
   CHAR8 memmap_buffer[4096 * 4];
-  struct MemoryMap map = {sizeof(memmap_buffer), memmap_buffer, 0, 0, 0, 0};
+  struct MemoryMap map = {sizeof(memmap_buffer), memmap_buffer, 0, 0x0, 0x0, 0x0};
 
   if (map.buffer == NULL) {
     status = EFI_BUFFER_TOO_SMALL;
@@ -486,36 +486,36 @@ UefiMain(EFI_HANDLE ImageHandle,EFI_SYSTEM_TABLE *SystemTable) {
 												   &map.descriptor_size,
 												   &map.descriptor_version);
 
-  SystemTable->BootServices->Stall(500000);
-  Print(L"[");
-  if (EFI_ERROR(status)) {
-    SystemTable->ConOut->SetAttribute(SystemTable->ConOut, EFI_LIGHTRED);
-    Print(L"%r", status);
-  } else {
-    SystemTable->ConOut->SetAttribute(SystemTable->ConOut, EFI_LIGHTGREEN);
-    Print(L"%r", status);
-  }
-  SystemTable->ConOut->SetAttribute(SystemTable->ConOut, EFI_WHITE);
-  Print(L"]    GetMemoryMap\n");
-  if (EFI_ERROR(status)) {
-    hlt();
-  }
-
+  /* SystemTable->BootServices->Stall(500000); */
+  /* Print(L"["); */
+  /* if (EFI_ERROR(status)) { */
+  /*   SystemTable->ConOut->SetAttribute(SystemTable->ConOut, EFI_LIGHTRED); */
+  /*   Print(L"%r", status); */
+  /* } else { */
+  /*   SystemTable->ConOut->SetAttribute(SystemTable->ConOut, EFI_LIGHTGREEN); */
+  /*   Print(L"%r", status); */
+  /* } */
+  /* SystemTable->ConOut->SetAttribute(SystemTable->ConOut, EFI_WHITE); */
+  /* Print(L"]    GetMemoryMap\n"); */
+  /* if (EFI_ERROR(status)) { */
+  /*   hlt(); */
+  /* } */
+  
   /* ===================================================================================== */
   /* ExitBootServicesをする。 */
 
   status = gBS->ExitBootServices(ImageHandle, map.map_key);
-
-  Print(L"[");
-  if (EFI_ERROR(status)) {
-    SystemTable->ConOut->SetAttribute(SystemTable->ConOut, EFI_LIGHTRED);
-    Print(L"%r", status);
-  } else {
-    SystemTable->ConOut->SetAttribute(SystemTable->ConOut, EFI_LIGHTGREEN);
-    Print(L"%r", status);
-  }
-  SystemTable->ConOut->SetAttribute(SystemTable->ConOut, EFI_WHITE);
-  Print(L"]    first ExitBootServices\n");
+  /* Print(L"%r",status); */
+  /* Print(L"["); */
+  /* if (EFI_ERROR(status)) { */
+  /*   SystemTable->ConOut->SetAttribute(SystemTable->ConOut, EFI_LIGHTRED); */
+  /*   Print(L"%r", status); */
+  /* } else { */
+  /*   SystemTable->ConOut->SetAttribute(SystemTable->ConOut, EFI_LIGHTGREEN); */
+  /*   Print(L"%r", status); */
+  /* } */
+  /* SystemTable->ConOut->SetAttribute(SystemTable->ConOut, EFI_WHITE); */
+  /* Print(L"]    first ExitBootServices\n"); */
 
   if (EFI_ERROR(status)) {
 
@@ -544,21 +544,21 @@ UefiMain(EFI_HANDLE ImageHandle,EFI_SYSTEM_TABLE *SystemTable) {
 													 &map.descriptor_size,
 													 &map.descriptor_version);
 
-	Print(L"%x",map.map_key);
+	/* Print(L"%x",map.map_key); */
 
-    Print(L"[");
-    if (EFI_ERROR(status)) {
-      SystemTable->ConOut->SetAttribute(SystemTable->ConOut, EFI_LIGHTRED);
-      Print(L"%r", status);
-    } else {
-      SystemTable->ConOut->SetAttribute(SystemTable->ConOut, EFI_LIGHTGREEN);
-      Print(L"%r", status);
-    }
-    SystemTable->ConOut->SetAttribute(SystemTable->ConOut, EFI_WHITE);
-    Print(L"]    GetMemoryMap\n");
-    if (EFI_ERROR(status)) {
-      hlt();
-    }
+    /* Print(L"["); */
+    /* if (EFI_ERROR(status)) { */
+    /*   SystemTable->ConOut->SetAttribute(SystemTable->ConOut, EFI_LIGHTRED); */
+    /*   Print(L"%r", status); */
+    /* } else { */
+    /*   SystemTable->ConOut->SetAttribute(SystemTable->ConOut, EFI_LIGHTGREEN); */
+    /*   Print(L"%r", status); */
+    /* } */
+    /* SystemTable->ConOut->SetAttribute(SystemTable->ConOut, EFI_WHITE); */
+    /* Print(L"]    GetMemoryMap\n"); */
+    /* if (EFI_ERROR(status)) { */
+    /*   hlt(); */
+    /* } */
 
         status = gBS->ExitBootServices(ImageHandle, map.map_key);
     Print(L"[");
