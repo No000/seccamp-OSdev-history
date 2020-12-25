@@ -11,6 +11,9 @@
 /* 12/21 ClearscreenとPrintを高速で繰り返せば選択画面を作れそう。（キー入力があれば、内容を書き換えた画面を表示） */
 /* 数値の出力にはEFI_LIGHTCYANでシアン色に変更することにする */
 
+
+
+
 #include  <Uefi.h>
 #include  <Library/UefiLib.h>
 #include  <Library/UefiBootServicesTableLib.h>
@@ -55,6 +58,8 @@ struct MemoryMap {
   unsigned long long descriptor_size;
   uint32_t descriptor_version;
 };
+
+
 
 /* strncpyだが名前衝突のエラーがうっとおしいため */
 /* 参考にした場合のミスが目立つ場合戻すこと */
@@ -111,7 +116,7 @@ EFI_STATUS OpenRootDir(EFI_HANDLE image_handle, EFI_FILE_PROTOCOL **root) {
 
 EFI_STATUS
 EFIAPI
-UefiMain(IN EFI_HANDLE ImageHandle, IN EFI_SYSTEM_TABLE *SystemTable) {
+UefiMain(EFI_HANDLE ImageHandle,EFI_SYSTEM_TABLE *SystemTable) {
   EFI_STATUS status; /* 各種EFI_STATUSの返り値を格納する変数 */
   EFI_FILE_PROTOCOL *root; /* rootを呼び出す */
   UINTN buf_size;
@@ -412,21 +417,51 @@ UefiMain(IN EFI_HANDLE ImageHandle, IN EFI_SYSTEM_TABLE *SystemTable) {
 
     /* 以下の処理がわからんので調べる */
     UINT64 segment_in_file = (UINT64)kernel_ehdr + phdr_copy_seg[i].p_offset;
-    CopyMem((VOID *)phdr_copy_seg[i].p_vaddr, (VOID *)segment_in_file, phdr_copy_seg[i].p_filesz);
+    CopyMem((VOID *)phdr_copy_seg[i].p_vaddr, (VOID *)segment_in_file,
+            phdr_copy_seg[i].p_filesz);
 
     UINTN remain_byte = phdr_copy_seg[i].p_memsz - phdr_copy_seg[i].p_filesz;
     SetMem((VOID *)(phdr_copy_seg[i].p_vaddr + phdr_copy_seg[i].p_filesz), remain_byte, 0);
+  }
 
-	
+  SystemTable->BootServices->Stall(500000);
+  Print(L"kernel first address:\t\t%08x\n", kernel_first_address);
+  SystemTable->BootServices->Stall(500000);
+  Print(L"kernel last address:\t\t%08x\n", kernel_last_address);
 
-    SystemTable->BootServices->Stall(500000);
-    Print(L"kernel first address:\t\t%08x\n", kernel_first_address);
-    SystemTable->BootServices->Stall(500000);
-    Print(L"kernel last address:\t\t%08x\n", kernel_last_address);
-	
-	/* ====================================================================================== */
-	/* カーネルの情報を読み出すために使用したメモリ上の一時領域を開放する */
-    status = SystemTable->BootServices->FreePool(kernel_buffer);
+  /* ===================================================================================== */
+  /* カーネルの情報を読み出すために使用したメモリ上の一時領域を開放する */
+  status = SystemTable->BootServices->FreePool(kernel_buffer);
+  SystemTable->BootServices->Stall(500000);
+  Print(L"[");
+  if (EFI_ERROR(status)) {
+    SystemTable->ConOut->SetAttribute(SystemTable->ConOut, EFI_LIGHTRED);
+    Print(L"%r", status);
+  } else {
+    SystemTable->ConOut->SetAttribute(SystemTable->ConOut, EFI_LIGHTGREEN);
+    Print(L"%r", status);
+  }
+  SystemTable->ConOut->SetAttribute(SystemTable->ConOut, EFI_WHITE);
+  Print(L"]    free pool\n");
+  if (EFI_ERROR(status)) {
+    hlt();
+  }
+  /* ======================================================================================
+   */
+  /* ======================================================================================
+   */
+  /* ExitBootServicesするためのmemorymapを取得する */
+  /* memmap_bufferの大きさの問題だが、問題が起こった場合whileで十分な値になるまで少しづつ増やす処理をする */
+  
+
+  /* MemoryMapを入れるためのメモリの一時領域を定義する */
+  /* mikanosのブートローダ273行目あたりを参照 */
+
+  CHAR8 memmap_buffer[4096 * 4];
+  struct MemoryMap map = {sizeof(memmap_buffer), memmap_buffer, 0, 0, 0, 0};
+
+  if (map.buffer == NULL) {
+    status = EFI_BUFFER_TOO_SMALL;
     SystemTable->BootServices->Stall(500000);
     Print(L"[");
     if (EFI_ERROR(status)) {
@@ -437,21 +472,52 @@ UefiMain(IN EFI_HANDLE ImageHandle, IN EFI_SYSTEM_TABLE *SystemTable) {
       Print(L"%r", status);
     }
     SystemTable->ConOut->SetAttribute(SystemTable->ConOut, EFI_WHITE);
-    Print(L"]    free pool\n");
+    Print(L"]    GetMemoryMap\n");
     if (EFI_ERROR(status)) {
       hlt();
     }
-	/* ====================================================================================== */
-	/* ====================================================================================== */
-	/* ExitBootServicesするためのmemorymapを取得する */
+  }
 
+  map.map_size = map.buffer_size;
 
+  status = SystemTable->BootServices->GetMemoryMap(&map.map_size,
+												   (EFI_MEMORY_DESCRIPTOR *)map.buffer,
+												   &map.map_key,
+												   &map.descriptor_size,
+												   &map.descriptor_version);
 
-	/* MemoryMapを入れるためのメモリの一時領域を定義する */
-	/* mikanosのブートローダ273行目あたりを参照 */
+  SystemTable->BootServices->Stall(500000);
+  Print(L"[");
+  if (EFI_ERROR(status)) {
+    SystemTable->ConOut->SetAttribute(SystemTable->ConOut, EFI_LIGHTRED);
+    Print(L"%r", status);
+  } else {
+    SystemTable->ConOut->SetAttribute(SystemTable->ConOut, EFI_LIGHTGREEN);
+    Print(L"%r", status);
+  }
+  SystemTable->ConOut->SetAttribute(SystemTable->ConOut, EFI_WHITE);
+  Print(L"]    GetMemoryMap\n");
+  if (EFI_ERROR(status)) {
+    hlt();
+  }
 
-    CHAR8 memmap_buffer[4096 * 4];
-    struct MemoryMap map = {sizeof(memmap_buffer), memmap_buffer, 0, 0, 0, 0};
+  /* ===================================================================================== */
+  /* ExitBootServicesをする。 */
+
+  status = gBS->ExitBootServices(ImageHandle, map.map_key);
+
+  Print(L"[");
+  if (EFI_ERROR(status)) {
+    SystemTable->ConOut->SetAttribute(SystemTable->ConOut, EFI_LIGHTRED);
+    Print(L"%r", status);
+  } else {
+    SystemTable->ConOut->SetAttribute(SystemTable->ConOut, EFI_LIGHTGREEN);
+    Print(L"%r", status);
+  }
+  SystemTable->ConOut->SetAttribute(SystemTable->ConOut, EFI_WHITE);
+  Print(L"]    first ExitBootServices\n");
+
+  if (EFI_ERROR(status)) {
 
     if (map.buffer == NULL) {
       status = EFI_BUFFER_TOO_SMALL;
@@ -470,13 +536,15 @@ UefiMain(IN EFI_HANDLE ImageHandle, IN EFI_SYSTEM_TABLE *SystemTable) {
       }
     }
 
-        map.map_size = map.buffer_size;
+    map.map_size = map.buffer_size;
 
-	status = SystemTable->BootServices->GetMemoryMap(&map.map_size,
+    status = SystemTable->BootServices->GetMemoryMap(&map.map_size,
 													 (EFI_MEMORY_DESCRIPTOR*)map.buffer,
 													 &map.map_key,
 													 &map.descriptor_size,
 													 &map.descriptor_version);
+
+	Print(L"%x",map.map_key);
 
     Print(L"[");
     if (EFI_ERROR(status)) {
@@ -491,6 +559,21 @@ UefiMain(IN EFI_HANDLE ImageHandle, IN EFI_SYSTEM_TABLE *SystemTable) {
     if (EFI_ERROR(status)) {
       hlt();
     }
+
+        status = gBS->ExitBootServices(ImageHandle, map.map_key);
+    Print(L"[");
+    if (EFI_ERROR(status)) {
+      SystemTable->ConOut->SetAttribute(SystemTable->ConOut, EFI_LIGHTRED);
+      Print(L"%r", status);
+    } else {
+      SystemTable->ConOut->SetAttribute(SystemTable->ConOut, EFI_LIGHTGREEN);
+      Print(L"%r", status);
+    }
+    SystemTable->ConOut->SetAttribute(SystemTable->ConOut, EFI_WHITE);
+    Print(L"]    second ExitBootServices\n");
+	if (EFI_ERROR(status)) {
+	  hlt();
+	}
   }
 
   hlt();
