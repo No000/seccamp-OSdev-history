@@ -396,6 +396,11 @@ UefiMain(EFI_HANDLE ImageHandle,EFI_SYSTEM_TABLE *SystemTable) {
   SystemTable->BootServices->Stall(500000);
   Print(L"kernel last address:\t\t%08x\n", kernel_last_address);
 
+
+
+
+
+  
   /* ===================================================================================== */
   /* カーネルの情報を読み出すために使用したメモリ上の一時領域を開放する */
   status = SystemTable->BootServices->FreePool(kernel_buffer);
@@ -405,6 +410,12 @@ UefiMain(EFI_HANDLE ImageHandle,EFI_SYSTEM_TABLE *SystemTable) {
   if (EFI_ERROR(status)) {
     hlt();
   }
+
+
+
+
+
+  
   /* ====================================================================================== */
   /* GOPの設定 */
   /* プロトコルを開いていく */
@@ -420,6 +431,10 @@ UefiMain(EFI_HANDLE ImageHandle,EFI_SYSTEM_TABLE *SystemTable) {
   status_cheacker(SystemTable, status);
   Print(L"GOP LocateHandleBuffer\n");
   SystemTable->BootServices->Stall(500000);
+
+
+
+  
   
   status = SystemTable->BootServices->OpenProtocol(gop_handles[0],
 												   &gEfiGraphicsOutputProtocolGuid,
@@ -430,6 +445,17 @@ UefiMain(EFI_HANDLE ImageHandle,EFI_SYSTEM_TABLE *SystemTable) {
   status_cheacker(SystemTable, status);
   Print(L"GOP OpenProtocol\n");
   FreePool(gop_handles);		/* この処理が何なのかが気になる */
+
+
+  Print(L"FrameBufferSize%d\n", gop->Mode->FrameBufferSize);
+
+
+  /* UINT8 *frame_buffer  =(UINT8*)gop->Mode->FrameBufferBase; */
+  /* for (UINTN i = 0; i < gop->Mode->FrameBufferSize; ++i) { */
+  /* 	frame_buffer[i] = 255; */
+  /* } */
+  
+  /* ここにグラフィックの値設定をする */
   
   /* ====================================================================================== */
   /* ExitBootServicesするためのmemorymapを取得する */
@@ -534,7 +560,7 @@ UefiMain(EFI_HANDLE ImageHandle,EFI_SYSTEM_TABLE *SystemTable) {
     /*   hlt(); */
     /* } */
 
-    /*     status = gBS->ExitBootServices(ImageHandle, map.map_key); */
+        status = gBS->ExitBootServices(ImageHandle, map.map_key);
     /* Print(L"["); */
     /* if (EFI_ERROR(status)) { */
     /*   SystemTable->ConOut->SetAttribute(SystemTable->ConOut, EFI_LIGHTRED); */
@@ -548,7 +574,27 @@ UefiMain(EFI_HANDLE ImageHandle,EFI_SYSTEM_TABLE *SystemTable) {
 	/* if (EFI_ERROR(status)) { */
 	/*   hlt(); */
 	/* } */
+
+        UINT8 *frame_buffer = (UINT8 *)gop->Mode->FrameBufferBase;
+        for (UINTN i = 0; i < gop->Mode->FrameBufferSize; ++i) {
+          frame_buffer[i] = 255;
+        }
   }
+
+  UINT8 *frame_buffer  =(UINT8*)gop->Mode->FrameBufferBase;
+  for (UINTN i = 0; i < gop->Mode->FrameBufferSize; ++i) {
+	frame_buffer[i] = 0;
+  }
+  /* カーネル側での手土産の設定とカーネルさんへのお願い */
+  UINT64 entry_addr = *(UINT64*)(kernel_first_address + 24);
+  typedef void EntryPointType();
+
+  EntryPointType* entry_point = (EntryPointType*)entry_addr;
+  entry_point();
+
+  while (1) {
+	EFI_SUCCESS;
+	  }
 
   hlt();
   return 0;
