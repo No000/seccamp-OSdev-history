@@ -447,6 +447,14 @@ UefiMain(EFI_HANDLE ImageHandle,EFI_SYSTEM_TABLE *SystemTable) {
   FreePool(gop_handles);		/* この処理が何なのかが気になる */
 
 
+  /* ピクセルフォーマットの確認する関数 */
+  Print(L"%d\n", gop->Mode->Info->PixelFormat);
+
+  
+  /* RGBで指定できるように設定をする */
+
+
+
   Print(L"FrameBufferSize%d\n", gop->Mode->FrameBufferSize);
 
 
@@ -486,36 +494,12 @@ UefiMain(EFI_HANDLE ImageHandle,EFI_SYSTEM_TABLE *SystemTable) {
 												   &map.descriptor_size,
 												   &map.descriptor_version);
 
-  /* SystemTable->BootServices->Stall(500000); */
-  /* Print(L"["); */
-  /* if (EFI_ERROR(status)) { */
-  /*   SystemTable->ConOut->SetAttribute(SystemTable->ConOut, EFI_LIGHTRED); */
-  /*   Print(L"%r", status); */
-  /* } else { */
-  /*   SystemTable->ConOut->SetAttribute(SystemTable->ConOut, EFI_LIGHTGREEN); */
-  /*   Print(L"%r", status); */
-  /* } */
-  /* SystemTable->ConOut->SetAttribute(SystemTable->ConOut, EFI_WHITE); */
-  /* Print(L"]    GetMemoryMap\n"); */
-  /* if (EFI_ERROR(status)) { */
-  /*   hlt(); */
-  /* } */
   
   /* ===================================================================================== */
   /* ExitBootServicesをする。 */
 
   status = gBS->ExitBootServices(ImageHandle, map.map_key);
-  /* Print(L"%r",status); */
-  /* Print(L"["); */
-  /* if (EFI_ERROR(status)) { */
-  /*   SystemTable->ConOut->SetAttribute(SystemTable->ConOut, EFI_LIGHTRED); */
-  /*   Print(L"%r", status); */
-  /* } else { */
-  /*   SystemTable->ConOut->SetAttribute(SystemTable->ConOut, EFI_LIGHTGREEN); */
-  /*   Print(L"%r", status); */
-  /* } */
-  /* SystemTable->ConOut->SetAttribute(SystemTable->ConOut, EFI_WHITE); */
-  /* Print(L"]    first ExitBootServices\n"); */
+
 
   if (EFI_ERROR(status)) {
 
@@ -544,36 +528,10 @@ UefiMain(EFI_HANDLE ImageHandle,EFI_SYSTEM_TABLE *SystemTable) {
 													 &map.descriptor_size,
 													 &map.descriptor_version);
 
-	/* Print(L"%x",map.map_key); */
 
-    /* Print(L"["); */
-    /* if (EFI_ERROR(status)) { */
-    /*   SystemTable->ConOut->SetAttribute(SystemTable->ConOut, EFI_LIGHTRED); */
-    /*   Print(L"%r", status); */
-    /* } else { */
-    /*   SystemTable->ConOut->SetAttribute(SystemTable->ConOut, EFI_LIGHTGREEN); */
-    /*   Print(L"%r", status); */
-    /* } */
-    /* SystemTable->ConOut->SetAttribute(SystemTable->ConOut, EFI_WHITE); */
-    /* Print(L"]    GetMemoryMap\n"); */
-    /* if (EFI_ERROR(status)) { */
-    /*   hlt(); */
-    /* } */
 
         status = gBS->ExitBootServices(ImageHandle, map.map_key);
-    /* Print(L"["); */
-    /* if (EFI_ERROR(status)) { */
-    /*   SystemTable->ConOut->SetAttribute(SystemTable->ConOut, EFI_LIGHTRED); */
-    /*   Print(L"%r", status); */
-    /* } else { */
-    /*   SystemTable->ConOut->SetAttribute(SystemTable->ConOut, EFI_LIGHTGREEN); */
-    /*   Print(L"%r", status); */
-    /* } */
-    /* SystemTable->ConOut->SetAttribute(SystemTable->ConOut, EFI_WHITE); */
-    /* Print(L"]    second ExitBootServices\n"); */
-	/* if (EFI_ERROR(status)) { */
-	/*   hlt(); */
-	/* } */
+
 
         UINT8 *frame_buffer = (UINT8 *)gop->Mode->FrameBufferBase;
         for (UINTN i = 0; i < gop->Mode->FrameBufferSize; ++i) {
@@ -581,9 +539,17 @@ UefiMain(EFI_HANDLE ImageHandle,EFI_SYSTEM_TABLE *SystemTable) {
         }
   }
 
-  UINT8 *frame_buffer  =(UINT8*)gop->Mode->FrameBufferBase;
+  /* UINT8 *frame_buffer  =(UINT8*)gop->Mode->FrameBufferBase; */
+  unsigned int hr = gop->Mode->Info->HorizontalResolution;
+  EFI_GRAPHICS_OUTPUT_BLT_PIXEL *p = (EFI_GRAPHICS_OUTPUT_BLT_PIXEL *)gop->Mode->FrameBufferBase;
+  EFI_GRAPHICS_OUTPUT_BLT_PIXEL *q = p + (hr * 30) + 30;
   for (UINTN i = 0; i < gop->Mode->FrameBufferSize; ++i) {
-	frame_buffer[i] = 0;
+	/* frame_buffer[i] = 0x24; */
+	q[i].Red = 0xdc;
+	q[i].Green = 0x14;
+	q[i].Blue = 0x3c;
+	
+	
   }
   /* カーネル側での手土産の設定とカーネルさんへのお願い */
   UINT64 entry_addr = *(UINT64*)(kernel_first_address + 24);
