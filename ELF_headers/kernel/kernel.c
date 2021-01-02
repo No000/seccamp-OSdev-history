@@ -1,7 +1,6 @@
 #include <stdint.h>
 
-#define INTEL_ASM_BEGIN ".intel_syntax noprefix\n\t"
-#define INTEL_ASM_END   ".att_syntax prefix\n\t"
+#define INTEL_ASM_BEGIN ".intel_syntax noprefix\n\t" /* clangの場合.att_syntax prefixは必要ない */
 
 typedef struct VIDEO_INFO {
   uint8_t *frame_buffer_addr;
@@ -18,7 +17,6 @@ void serialport_output(uint8_t ascii_code) {
                    "mov dx, 0x3f8\n\t"
                    /* "mov al, 1\n" */
                    "out dx, al\n\t"
-				   INTEL_ASM_END
 				   :
 				   :"a"(ascii_code)/* EAXレジスタに変数の値を代入 */
 				   :"%dx");		   /* clover_listでレジスタを破壊 */
