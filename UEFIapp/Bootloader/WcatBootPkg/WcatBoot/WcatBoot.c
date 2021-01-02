@@ -51,7 +51,16 @@ struct FILE {
 
 
 
-
+/* boot時にカーネルに渡す情報 */
+/* マルチブート2に準拠した構成にするか悩み中 */
+/* とりあえずで作成したminOSベースの構造体 */
+struct VIDEO_INFO {
+  uint8_t *frame_buffer_addr;
+  uint64_t frame_buffer_size;
+  uint32_t horizen_size;
+  uint32_t vertical_size;
+  uint32_t pixel_per_scanline;
+};
 
 /* このMemoryMapはヘッダーファイル化してkernelにもincludeさせる必要があるかもしれない
  */
@@ -107,6 +116,7 @@ EFI_STATUS OpenRootDir(EFI_HANDLE image_handle, EFI_FILE_PROTOCOL **root) {
   EFI_STATUS status;
   EFI_LOADED_IMAGE_PROTOCOL *loaded_image;
   EFI_SIMPLE_FILE_SYSTEM_PROTOCOL *fs;
+
 
   /* なぜはじめOpenVolumeでプロトコルを開けなかったか？ */
   /* EFI_SIMPLE_FILE_SYSTEM_PROTOCOL
@@ -422,7 +432,8 @@ UefiMain(EFI_HANDLE ImageHandle,EFI_SYSTEM_TABLE *SystemTable) {
   EFI_GRAPHICS_OUTPUT_PROTOCOL *gop;
   UINTN num_gop_handles = 0;	/*  */
   EFI_HANDLE *gop_handles = NULL;
-
+  struct VIDEO_INFO video_infomation;
+  
   status = SystemTable->BootServices->LocateHandleBuffer(ByProtocol,
 														 &gEfiGraphicsOutputProtocolGuid,
 														 NULL,
@@ -462,8 +473,13 @@ UefiMain(EFI_HANDLE ImageHandle,EFI_SYSTEM_TABLE *SystemTable) {
   /* for (UINTN i = 0; i < gop->Mode->FrameBufferSize; ++i) { */
   /* 	frame_buffer[i] = 255; */
   /* } */
-  
-  /* ここにグラフィックの値設定をする */
+
+  /* カーネルに渡すグラフィックのデータ */
+  video_infomation.frame_buffer_addr = (uint8_t *)gop->Mode->FrameBufferBase;
+  video_infomation.frame_buffer_size = (uint64_t)gop->Mode->FrameBufferSize;
+  video_infomation.horizen_size = (uint32_t)gop->Mode->Info->HorizontalResolution;
+  video_infomation.vertical_size = (uint32_t)gop->Mode->Info->VerticalResolution;
+  video_infomation.pixel_per_scanline = (uint32_t)gop->Mode->Info->PixelsPerScanLine;
   
   /* ====================================================================================== */
   /* ExitBootServicesするためのmemorymapを取得する */
@@ -547,16 +563,14 @@ UefiMain(EFI_HANDLE ImageHandle,EFI_SYSTEM_TABLE *SystemTable) {
 	/* frame_buffer[i] = 0x24; */
 	q[i].Red = 0xdc;
 	q[i].Green = 0x14;
-	q[i].Blue = 0x3c;
-	
-	
+	q[i].Blue = 0x3c;	
   }
   /* カーネル側での手土産の設定とカーネルさんへのお願い */
   UINT64 entry_addr = *(UINT64*)(kernel_first_address + 24);
-  typedef void EntryPointType();
+  typedef void EntryPointType(const struct VIDEO_INFO*);
 
   EntryPointType* entry_point = (EntryPointType*)entry_addr;
-  entry_point();
+  entry_point(&video_infomation);
 
   while (1) {
 	EFI_SUCCESS;
