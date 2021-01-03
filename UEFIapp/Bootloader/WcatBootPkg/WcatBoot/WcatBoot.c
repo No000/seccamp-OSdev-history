@@ -561,9 +561,9 @@ UefiMain(EFI_HANDLE ImageHandle,EFI_SYSTEM_TABLE *SystemTable) {
   EFI_GRAPHICS_OUTPUT_BLT_PIXEL *q = p + (hr * 30) + 30;
   for (UINTN i = 0; i < gop->Mode->FrameBufferSize; ++i) {
 	/* frame_buffer[i] = 0x24; */
-	q[i].Red = 0xdc;
-	q[i].Green = 0x14;
-	q[i].Blue = 0x3c;	
+	q[i].Red = 0xAD;
+	q[i].Green = 0xFF;
+	q[i].Blue = 0x2F;	
   }
   /* カーネル側での手土産の設定とカーネルさんへのお願い */
   UINT64 entry_addr = *(UINT64*)(kernel_first_address + 24);

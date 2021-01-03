@@ -10,6 +10,12 @@ typedef struct VIDEO_INFO {
   uint32_t pixel_per_scanline;
 } VIDEO_INFO;
 
+typedef struct pixel_bit_mask{
+  uint8_t red_mask;
+  uint8_t green_mask;
+  uint8_t blue_mask;
+  uint8_t reserved_mask;
+} pixel_bit_mask;
 
 
 void serialport_output(uint8_t ascii_code) {
@@ -34,11 +40,12 @@ void kernel_main(VIDEO_INFO *video_infomation) {
 	serialport_output(output_data[i]);
   }
 
-  uint8_t *frame_buffer = video_infomation->frame_buffer_addr;
+  pixel_bit_mask *frame_buffer = (pixel_bit_mask *)video_infomation->frame_buffer_addr;
     for (uint32_t i = 0; i < video_infomation->frame_buffer_size; ++i) {
-	frame_buffer[i] = 0xFF;
+	  frame_buffer[i].red_mask = 0xad;
+	  frame_buffer[i].green_mask = 0xff;
+	  frame_buffer[i].blue_mask  = 0x2f;
 	}
 
   while (1) 	hlt();
 }
-
