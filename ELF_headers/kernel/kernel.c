@@ -10,10 +10,12 @@ typedef struct VIDEO_INFO {
   uint32_t pixel_per_scanline;
 } VIDEO_INFO;
 
+
+/* EDK2の定義では */
 typedef struct pixel_bit_mask{
-  uint8_t red_mask;
-  uint8_t green_mask;
   uint8_t blue_mask;
+  uint8_t green_mask;
+  uint8_t red_mask;  
   uint8_t reserved_mask;
 } pixel_bit_mask;
 
